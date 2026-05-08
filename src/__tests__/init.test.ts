@@ -75,7 +75,7 @@ describe('createEtheraConfig initialization', () => {
     expect(config.getEntryPoint(rollupB.id)).toBe(rollupBEntryPoint);
   });
 
-  it('fails fast when contracts are missing for a configured chain', () => {
+  it('allows wagmi chains without AA contracts (treated as non-AA chains)', () => {
     expect(() =>
       createEtheraConfig({
         wagmi: wagmiConfig,
@@ -83,9 +83,32 @@ describe('createEtheraConfig initialization', () => {
           [rollupA.id]: rollupsAccountAbstractionContracts
         }
       })
+    ).not.toThrow();
+  });
+
+  it('fails fast when an AA chain is not present in the wagmi config', () => {
+    const rollupAOnlyWagmiConfig = createConfig({
+      chains: [rollupA],
+      client(parameters) {
+        return createPublicClient({
+          chain: parameters.chain,
+          transport: http(parameters.chain.rpcUrls.default.http[0]),
+          rpcSchema: rpcSchema<EtheraRpcSchema>()
+        });
+      }
+    });
+
+    expect(() =>
+      createEtheraConfig({
+        wagmi: rollupAOnlyWagmiConfig,
+        accountAbstractionContracts: {
+          [rollupA.id]: rollupsAccountAbstractionContracts,
+          [rollupB.id]: rollupsAccountAbstractionContracts
+        } as never
+      })
     ).toThrowError(
       expect.objectContaining<Partial<EtheraError>>({
-        code: 'ACCOUNT_ABSTRACTION_CONTRACTS_MISSING',
+        code: 'PUBLIC_CLIENT_NOT_FOUND',
         details: { chainId: rollupB.id }
       })
     );
