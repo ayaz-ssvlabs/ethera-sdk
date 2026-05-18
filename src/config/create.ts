@@ -15,10 +15,16 @@ export function createEtheraConfig<TConfig extends Config>(
 ): EtheraConfigReturnType<TConfig> {
   const entryPoint = props.entryPoint ?? entryPointV07;
 
-  validateAccountAbstractionContracts(
-    props.wagmi.chains.map((chain) => chain.id) as TConfig['chains'][number]['id'][],
-    props.accountAbstractionContracts
-  );
+  const aaChainIds = Object.keys(props.accountAbstractionContracts).map(Number) as TConfig['chains'][number]['id'][];
+  const wagmiChainIds = new Set(props.wagmi.chains.map((c) => c.id));
+  for (const id of aaChainIds) {
+    if (!wagmiChainIds.has(id)) {
+      throw new EtheraError('PUBLIC_CLIENT_NOT_FOUND', `AA chain ${id} not present in wagmi config.`, {
+        details: { chainId: id }
+      });
+    }
+  }
+  validateAccountAbstractionContracts(aaChainIds, props.accountAbstractionContracts);
 
   return {
     getPaymasterEndpoint: props.getPaymasterEndpoint,
