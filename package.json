@@ -1,6 +1,6 @@
 {
   "name": "@ssv-labs/ethera-sdk",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "author": "SSV.Labs",
   "description": "Ethera SDK for multi-chain account abstraction",
   "keywords": [
