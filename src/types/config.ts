@@ -13,6 +13,12 @@ export type PaymasterEndpointArgs<TConfig extends Config> = {
 export type EtheraConfigArgs<TConfig extends Config> = {
   wagmi: TConfig;
   getPaymasterEndpoint?: (args: PaymasterEndpointArgs<TConfig>) => string;
+  /**
+   * XT submission endpoint (the sidecar `POST /xt` route, or a gateway in front of it).
+   * When set, `send()` posts the built raw legs as JSON here instead of calling the
+   * legacy `eth_sendXTransaction` RPC on the first chain's transport.
+   */
+  xtSubmissionUrl?: string;
   accountAbstractionContracts: Partial<Record<TConfig['chains'][number]['id'], AccountAbstractionContracts>>;
   entryPoint?: EntryPointType<'0.7'>;
   entryPoints?: Partial<Record<TConfig['chains'][number]['id'], EntryPointType<'0.7'>>>;
@@ -25,4 +31,4 @@ export type EtheraConfigReturnType<TConfig extends Config = Config> = {
   getEntryPoint: (chainId: TConfig['chains'][number]['id']) => EntryPointType<'0.7'>;
   hasPaymaster: boolean;
   entryPoint: EntryPointType<'0.7'>;
-} & Pick<EtheraConfigArgs<TConfig>, 'getPaymasterEndpoint' | 'accountAbstractionContracts' | 'entryPoints'>;
+} & Pick<EtheraConfigArgs<TConfig>, 'getPaymasterEndpoint' | 'accountAbstractionContracts' | 'entryPoints' | 'xtSubmissionUrl'>;

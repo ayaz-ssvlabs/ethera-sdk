@@ -306,12 +306,12 @@ describe('compose user operations', () => {
     expect(onSigned).toHaveBeenCalledWith([createCanonical('a'), createCanonical('b')]);
 
     expect(publicClientA.request).toHaveBeenCalledWith({
-      method: 'compose_buildSignedUserOpsTx',
-      params: [[createCanonical('a')], { chainId: 1 }]
+      method: 'ethera_buildSignedUserOpsTx',
+      params: [[createCanonical('a')], { chainId: 1, submit: false }]
     });
     expect(publicClientB.request).toHaveBeenCalledWith({
-      method: 'compose_buildSignedUserOpsTx',
-      params: [[createCanonical('b')], { chainId: 2 }]
+      method: 'ethera_buildSignedUserOpsTx',
+      params: [[createCanonical('b')], { chainId: 2, submit: false }]
     });
 
     expect(onComposed).toHaveBeenCalledWith(
@@ -537,12 +537,12 @@ describe('compose user operations', () => {
     });
     expect(onSigned).toHaveBeenCalledWith([createCanonical('a'), createCanonical('b')]);
     expect(publicClientA.request).toHaveBeenCalledWith({
-      method: 'compose_buildSignedUserOpsTx',
-      params: [[createCanonical('a')], { chainId: 1 }]
+      method: 'ethera_buildSignedUserOpsTx',
+      params: [[createCanonical('a')], { chainId: 1, submit: false }]
     });
     expect(publicClientB.request).toHaveBeenCalledWith({
-      method: 'compose_buildSignedUserOpsTx',
-      params: [[createCanonical('b')], { chainId: 2 }]
+      method: 'ethera_buildSignedUserOpsTx',
+      params: [[createCanonical('b')], { chainId: 2, submit: false }]
     });
   });
 
@@ -891,7 +891,7 @@ describe('structured error wrapping', () => {
     vi.clearAllMocks();
   });
 
-  it('wraps compose_buildSignedUserOpsTx failure as COMPOSE_BUILD_FAILURE with cause', async () => {
+  it('wraps ethera_buildSignedUserOpsTx failure as COMPOSE_BUILD_FAILURE with cause', async () => {
     const rootCause = new Error('rpc error');
     (publicClient.request as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(rootCause);
 
@@ -918,6 +918,31 @@ describe('structured error wrapping', () => {
         cause: rootCause
       })
     );
+  });
+
+  it('posts raw legs to the configured XT submission endpoint', async () => {
+    vi.mocked(encodeXtMessage).mockReturnValue('0xpayload' as Hex);
+    (publicClient.request as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      hash: '0xabc' as Hex,
+      raw: '0xraw'
+    });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const result = await composeSignedUserOps([signedOp], {
+        config: { ...baseConfig, xtSubmissionUrl: 'https://xt.test/xt' }
+      });
+      await result.send();
+
+      expect(fetchMock).toHaveBeenCalledWith('https://xt.test/xt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactions: { '1': ['0xraw'] } })
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('wraps eth_sendXTransaction failure as SEND_FAILURE with cause', async () => {

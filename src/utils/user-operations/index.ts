@@ -275,13 +275,13 @@ const composeSignedUserOpsInternal = async (
     operations.map((operation, operationIndex) =>
       operation.publicClient
         .request({
-          method: 'compose_buildSignedUserOpsTx',
-          params: [[operation.signedCanonicalOps], { chainId: operation.publicClient.chain!.id }]
+          method: 'ethera_buildSignedUserOpsTx',
+          params: [[operation.signedCanonicalOps], { chainId: operation.publicClient.chain!.id, submit: false }]
         })
         .catch((cause: unknown) => {
           throw new EtheraError(
             'COMPOSE_BUILD_FAILURE',
-            `compose_buildSignedUserOpsTx failed for operation ${operationIndex}.`,
+            `ethera_buildSignedUserOpsTx failed for operation ${operationIndex}.`,
             { cause, details: { method: 'composeSignedUserOpsInternal', operationIndex, chainId: operation.publicClient.chain!.id } }
           );
         })
@@ -325,13 +325,31 @@ const composeSignedUserOpsInternal = async (
     explorerUrls,
     operations: operationMetadata,
     send: async () => {
+      const xtSubmissionUrl = options.config?.xtSubmissionUrl;
       try {
-        await operations[0].publicClient.request({
-          method: 'eth_sendXTransaction',
-          params: [payload]
-        });
+        if (xtSubmissionUrl) {
+          // Sidecar-style submission: POST the built raw legs as JSON to the XT endpoint.
+          const transactions: Record<string, string[]> = {};
+          builds.forEach((build, operationIndex) => {
+            const chainId = String(operations[operationIndex].publicClient.chain!.id);
+            (transactions[chainId] ??= []).push(build.raw);
+          });
+          const response = await fetch(xtSubmissionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactions })
+          });
+          if (!response.ok) {
+            throw new Error(`XT endpoint responded ${response.status}: ${await response.text()}`);
+          }
+        } else {
+          await operations[0].publicClient.request({
+            method: 'eth_sendXTransaction',
+            params: [payload]
+          });
+        }
       } catch (cause) {
-        throw new EtheraError('SEND_FAILURE', 'eth_sendXTransaction failed.', {
+        throw new EtheraError('SEND_FAILURE', xtSubmissionUrl ? 'XT submission failed.' : 'eth_sendXTransaction failed.', {
           cause,
           details: { method: 'composeSignedUserOpsInternal' }
         });
