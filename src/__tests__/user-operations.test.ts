@@ -920,6 +920,22 @@ describe('structured error wrapping', () => {
     );
   });
 
+  it('routes the build call to getBundlerUrl when configured', async () => {
+    vi.mocked(encodeXtMessage).mockReturnValue('0xpayload' as Hex);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ result: { hash: '0xh', raw: '0xr' } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await composeSignedUserOps([signedOp], {
+        config: { getBundlerUrl: () => 'https://bundler.test' }
+      });
+      expect(fetchMock).toHaveBeenCalledWith('https://bundler.test', expect.objectContaining({ method: 'POST' }));
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.method).toBe('ethera_buildSignedUserOpsTx');
+      expect(body.params[1]).toMatchObject({ chainId: 1, submit: false });
+      expect(publicClient.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'ethera_buildSignedUserOpsTx' }));
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it('posts raw legs to the configured XT submission endpoint', async () => {
     vi.mocked(encodeXtMessage).mockReturnValue('0xpayload' as Hex);
     (publicClient.request as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
